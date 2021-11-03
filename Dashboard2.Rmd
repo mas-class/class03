@@ -1,0 +1,200 @@
+---
+title: "Academatica Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(readr)
+library(dplyr)
+library(formattable)
+library(ggplot2)
+library(lubridate)
+library(DT)
+library(tm)
+library(wordcloud)
+
+
+# Notas: https://fontawesome.com/
+# https://pastebin.com/Qi1FwZx4
+```
+
+
+```{r datasets}
+videos <- read.csv("C:/Users/MS0827/Desktop/MSc/Product Development/data/academatica_videos.csv")
+metadata <- read_csv("C:/Users/MS0827/Desktop/MSc/Product Development/data/academatica_videos_metadata.csv")
+stats <- read.csv("C:/Users/MS0827/Desktop/MSc/Product Development/data/academatica_video_stats.csv")
+earthquake <- read_csv("C:/Users/MS0827/Desktop/MSc/Product Development/data/earthquakedata.csv")
+
+```
+
+
+```{r metricas}
+metricas <-
+  stats %>%
+  summarise(total_like = sum(likeCount),
+            total_views = sum(viewCount),
+            total_dislikes = sum(dislikeCount),
+            total_comments = sum(commentCount))
+  
+```
+
+
+# Metricas {data-icon=fa-ruler}
+
+##
+
+### Total Likes
+
+```{r}
+valueBox(formattable::comma(metricas$total_like, digits= 0),
+         icon="fa-thumbs-up",
+         color= "success",
+         caption = "Total de Likes")
+
+```
+
+### Reproducciones
+
+```{r}
+valueBox(formattable::comma(metricas$total_views, digits=0),
+         icon = "fa-eye",
+         color = "info",
+         caption = "Total Reproducciones"         )
+
+```
+
+### Comentarios
+
+```{r}
+valueBox(formattable::comma(metricas$total_comments, digits=0),
+         icon = "fa-comments",
+         color = "primary")
+
+```
+
+##
+
+### Razon de Likes
+
+```{r}
+like_rate <- metricas$total_like / (metricas$total_like+metricas$total_dislikes)
+like_rate <- round(like_rate*100, 0)
+
+gauge(like_rate, 
+      min = 0, 
+      max = 100, 
+      symbol = "%",
+      gaugeSectors(success = c(80, 100),
+                   warning = c(40, 79),
+                   danger = c(0, 39)))
+
+```
+
+### Razon de Dislikes
+
+```{r}
+gauge(100-like_rate, 
+      min = 0, 
+      max = 100, 
+      symbol = "%", 
+      gaugeSectors(success = c(80, 100),
+                   warning = c(40, 79),
+                   danger = c(0, 39)))
+
+```
+
+##
+
+### Videos subidos por anios y mes
+
+```{r}
+videos %>%
+  mutate(year = year(ymd_hms(contentDetails.videoPublishedAt)),
+         month = month(ymd_hms(contentDetails.videoPublishedAt)),
+         year = as.factor(year),
+         month = as.factor(month)) %>%
+  
+  group_by(year, month) %>%
+  summarise(uploaded_videos = n_distinct(contentDetails.videoId)) %>%
+  ggplot(aes(x=month, y=uploaded_videos, fill=year)) +
+  geom_col(position = "dodge")
+
+```
+
+# Data {data-icon=fa-database}
+
+## {.tabset}
+
+### Tabla
+
+```{r}
+stats %>%
+  mutate(has_like = if_else(likeCount > 0, TRUE, FALSE)) %>%
+  filter(has_like) %>%
+  left_join(metadata, by= c("id" = "video_id")) %>%
+  select(id, title, viewCount) %>%
+  datatable()
+  
+```
+
+
+### Word Cloud
+
+```{r}
+docs <- Corpus(VectorSource(metadata$title))
+toSpace <- content_transformer(function (x , pattern ) gsub(pattern, " ", x))
+docs <- tm_map(docs, toSpace, "-")
+docs <- tm_map(docs, toSpace, "\\(")
+docs <- tm_map(docs, toSpace, "\\)")
+docs <- tm_map(docs, toSpace, "\\|")
+docs <- tm_map(docs, content_transformer(tolower))
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, removeWords, stopwords("spanish"))
+docs <- tm_map(docs, content_transformer(tolower))
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, removeWords, stopwords("english"))
+docs <- tm_map(docs, removeWords, c("video", 
+                                    "problema",
+                                    "ejemplo",
+                                    "parte",
+                                    "ejercicio",
+                                    "ejercicios",
+                                    "ejemplos")) 
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, stripWhitespace)
+dtm <- TermDocumentMatrix(docs)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+set.seed(1234)
+wordcloud(words = d$word, freq = d$freq, min.freq = 1,
+          max.words=100, random.order=TRUE, rot.per=0.1, 
+          colors=brewer.pal(8, "Dark2"))
+
+```
+
+
+###
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

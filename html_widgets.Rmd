@@ -1,0 +1,92 @@
+---
+title: "HTML_Widgets"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(readr)
+library(dplyr)
+library(leaflet)
+library(DT)
+library(plotly)
+library(crosstalk)
+#devtools::install_github("rstudio/crosstalk")
+
+```
+
+
+```{r dataset}
+quake <- read_csv("C:/Users/MS0827/Desktop/MSc/Product Development/data/earthquakedata.csv")
+```
+
+# leaflet
+
+## 
+
+### Tabla
+
+```{r tabla}
+quake %>%
+  filter(yr==1995) %>%
+  datatable()
+  
+```
+
+### Mapa
+
+```{r mapa}
+quake %>%
+  filter(yr==1995) %>%
+  leaflet() %>%
+  addTiles() %>%
+  addMarkers(lng= ~lon,
+             lat= ~lat,
+             label= ~mag)
+  
+```
+
+# crosstalk
+
+```{r dataset}
+shared_quake <- SharedData$new(quake %>% filter(yr > 2000))
+
+```
+
+##
+
+### {data-width = 300}
+
+```{r filtros}
+
+filter_slider("mag", "Magnitud", shared_quake, step = 0.1, column= ~mag)
+filter_select("yr", "Anio", shared_quake, group= ~yr, multiple = FALSE )
+
+```
+
+###
+
+```{r tabla}
+shared_quake %>%
+  datatable()
+```
+
+###
+
+```{r mapa}
+shared_quake %>%
+  leaflet() %>%
+  addTiles() %>%
+  addMarkers(lng = ~lon,
+             lat = ~lat,
+             label = ~mag)
+
+```
+
+
+
+
+
